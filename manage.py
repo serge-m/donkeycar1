@@ -4,32 +4,32 @@ Scripts to drive a donkey 2 car and train a model for it.
 
 Usage:
     manage.py (drive) [--model=<model>] [--js] [--chaos]
-    manage.py (train) [--tub=<tub1,tub2,..tubn>]  (--model=<model>) [--base_model=<base_model>] [--no_cache]
+    manage.py (train) [--tub=<tub1,tub2,..tubn>]  (--model=<model>) [--base_model=<base_model>] [--model_class=<modelclass>] [--no_cache]
 
 Options:
     -h --help        Show this screen.
     --tub TUBPATHS   List of paths to tubs. Comma separated. Use quotes to use wildcards. ie "~/tubs/*"
     --chaos          Add periodic random steering when manually driving
+    --model_class MODELCLASS    class to spawn a model
 """
+import importlib
 import os
 
 from docopt import docopt
 import donkeycar as dk
 
 from donkeycar.parts.camera import PiCamera
-from donkeycar.parts.transform import Lambda
-from donkeycar.parts.keras import KerasLinear
 from donkeycar.parts.actuator import PCA9685, PWMSteering, PWMThrottle
-from donkeycar.parts.datastore import TubGroup, TubWriter
 from donkeycar.parts.web_controller import LocalWebController
 from donkeycar.parts.clock import Timestamp
 from donkeycar.parts.datastore import TubGroup, TubWriter
-from donkeycar.parts.keras import KerasLinear
+# from donkeycar.parts.keras import KerasLinear
 from donkeycar.parts.transform import Lambda
+
+from top_view_transform import TopViewTransform
 
 
 def drive(cfg, model_path=None, use_chaos=False):
-
     """
     Construct a working robotic vehicle from many parts.
     Each part runs as a job in the Vehicle loop, calling either
@@ -99,7 +99,7 @@ def drive(cfg, model_path=None, use_chaos=False):
     steering_controller = PCA9685(cfg.STEERING_CHANNEL)
     steering = PWMSteering(controller=steering_controller,
                            left_pulse=cfg.STEERING_LEFT_PWM,
-                           right_pulse=cfg.STEERING_RIGHT_PWM) 
+                           right_pulse=cfg.STEERING_RIGHT_PWM)
 
     throttle_controller = PCA9685(cfg.THROTTLE_CHANNEL)
     throttle = PWMThrottle(controller=throttle_controller,
@@ -112,7 +112,7 @@ def drive(cfg, model_path=None, use_chaos=False):
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
-    types = ['image_array', 'float', 'float',  'str', 'str']
+    types = ['image_array', 'float', 'float', 'str', 'str']
 
     # multiple tubs
     # th = TubHandler(path=cfg.DATA_PATH)
@@ -127,7 +127,7 @@ def drive(cfg, model_path=None, use_chaos=False):
             max_loop_count=cfg.MAX_LOOPS)
 
 
-def train(cfg, tub_names, new_model_path, base_model_path=None):
+def train(cfg, tub_names, new_model_path, base_model_path=None, model_class=''):
     """
     use the specified data in tub_names to train an artifical neural network
     saves the output trained model as model_name
@@ -137,7 +137,20 @@ def train(cfg, tub_names, new_model_path, base_model_path=None):
 
     new_model_path = os.path.expanduser(new_model_path)
 
-    kl = KerasLinear()
+    import tensorflow as tf
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True  # dynamically grow the memory used on the GPU
+    # config.log_device_placement=True
+    sess = tf.Session(config=config)
+    tf.keras.backend.set_session(sess)
+
+    model_module, model_class_name = model_class.rsplit('.', 1)
+    print("loading {} from {}...".format(model_class_name, model_module))
+
+    module = importlib.import_module(model_module)
+    model_cls = getattr(module, model_class_name)
+
+    kl = model_cls()
     if base_model_path is not None:
         base_model_path = os.path.expanduser(base_model_path)
         kl.load(base_model_path)
@@ -146,9 +159,14 @@ def train(cfg, tub_names, new_model_path, base_model_path=None):
     if not tub_names:
         tub_names = os.path.join(cfg.DATA_PATH, '*')
     tubgroup = TubGroup(tub_names)
+
+    top_view_transform = TopViewTransform(cfg.CAMERA_RESOLUTION)
     train_gen, val_gen = tubgroup.get_train_val_gen(X_keys, y_keys,
                                                     batch_size=cfg.BATCH_SIZE,
-                                                    train_frac=cfg.TRAIN_TEST_SPLIT)
+                                                    train_frac=cfg.TRAIN_TEST_SPLIT,
+                                                    train_record_transform=top_view_transform,
+                                                    val_record_transform=top_view_transform
+                                                    )
 
     total_records = len(tubgroup.df)
     total_train = int(total_records * cfg.TRAIN_TEST_SPLIT)
@@ -176,9 +194,4 @@ if __name__ == '__main__':
         new_model_path = args['--model']
         base_model_path = args['--base_model']
         cache = not args['--no_cache']
-        train(cfg, tub, new_model_path, base_model_path)
-
-
-
-
-
+        train(cfg, tub, new_model_path, base_model_path, model_class=args['--model_class'])
