@@ -13,7 +13,7 @@ Options:
     --chaos          Add periodic random steering when manually driving
 """
 import logging
-
+import os
 from docopt import docopt
 import donkeycar as dk
 
@@ -28,6 +28,7 @@ from donkeycar.parts.transform import Lambda
 from actuators import PWMSteering, PWMThrottle, MotorDriver
 
 from donkeycar1.web_controller import LocalWebControllerVis
+from top_view_transform import TopViewTransform
 
 
 def drive(cfg, model_path=None, use_chaos=False):
@@ -135,10 +136,6 @@ def drive(cfg, model_path=None, use_chaos=False):
             max_loop_count=cfg.MAX_LOOPS)
 
     
-######################################################3
-
-
-import os
 
 
 ############################################################################
@@ -158,13 +155,19 @@ def drive_vis(cfg, model_path=None, use_chaos=False):
     if model_path:
         kl.load(model_path)
 
-    V.add(kl,
+    top_view_transform = TopViewTransform(cfg.CAMERA_RESOLUTION)
+
+    V.add(top_view_transform.wrap,
           inputs=['cam/image_array'],
+          outputs=['cam/image_array_proj'])
+
+    V.add(kl,
+          inputs=['cam/image_array_proj'],
           outputs=['pilot/angle', 'pilot/throttle'])
 
     ctr = LocalWebControllerVis(use_chaos=use_chaos)
     V.add(ctr,
-          inputs=['cam/image_array', 'pilot/angle', 'pilot/throttle'],
+          inputs=['cam/image_array_proj', 'pilot/angle', 'pilot/throttle'],
           outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
           threaded=True)
 

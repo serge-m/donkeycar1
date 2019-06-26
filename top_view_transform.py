@@ -18,6 +18,10 @@ class TopViewTransform:
 
     def __call__(self, record):
         img = record[self.in_field_name]
+        warped_img = self.wrap(img)
+        return {**record, self.out_field_name: warped_img}
+
+    def wrap(self, img):
         M, _, _ = self.transform
         warped_img = cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))  # Image warping
-        return {**record, self.out_field_name: warped_img}
+        return warped_img
