@@ -18,7 +18,6 @@ from docopt import docopt
 import donkeycar as dk
 
 from donkeycar.parts.camera import PiCamera
-#from donkeycar.parts.actuator import PCA9685, PWMSteering, PWMThrottle
 from donkeycar.parts.web_controller import LocalWebController
 from donkeycar.parts.clock import Timestamp
 from donkeycar.parts.datastore import TubGroup, TubWriter
@@ -27,7 +26,7 @@ from donkeycar.parts.transform import Lambda
 
 from actuators import PWMSteering, PWMThrottle, MotorDriver
 
-from donkeycar1.web_controller import LocalWebControllerVis
+from web_controller import LocalWebControllerVis
 from top_view_transform import TopViewTransform
 
 
@@ -157,7 +156,7 @@ def drive_vis(cfg, model_path=None, use_chaos=False):
 
     top_view_transform = TopViewTransform(cfg.CAMERA_RESOLUTION)
 
-    V.add(top_view_transform.wrap,
+    V.add(Lambda(top_view_transform.wrap),
           inputs=['cam/image_array'],
           outputs=['cam/image_array_proj'])
 
@@ -234,42 +233,6 @@ def drive_vis(cfg, model_path=None, use_chaos=False):
     V.start(rate_hz=cfg.DRIVE_LOOP_HZ,
             max_loop_count=cfg.MAX_LOOPS)
 
-
-def train(cfg, tub_names, new_model_path, base_model_path=None):
-    """
-    use the specified data in tub_names to train an artifical neural network
-    saves the output trained model as model_name
-    """
-    X_keys = ['cam/image_array']
-    y_keys = ['user/angle', 'user/throttle']
-
-    new_model_path = os.path.expanduser(new_model_path)
-
-    kl = KerasLinear()
-    if base_model_path is not None:
-        base_model_path = os.path.expanduser(base_model_path)
-        kl.load(base_model_path)
-
-    print('tub_names', tub_names)
-    if not tub_names:
-        tub_names = os.path.join(cfg.DATA_PATH, '*')
-    tubgroup = TubGroup(tub_names)
-    train_gen, val_gen = tubgroup.get_train_val_gen(X_keys, y_keys,
-                                                    batch_size=cfg.BATCH_SIZE,
-                                                    train_frac=cfg.TRAIN_TEST_SPLIT)
-
-    total_records = len(tubgroup.df)
-    total_train = int(total_records * cfg.TRAIN_TEST_SPLIT)
-    total_val = total_records - total_train
-    print('train: %d, validation: %d' % (total_train, total_val))
-    steps_per_epoch = total_train // cfg.BATCH_SIZE
-    print('steps_per_epoch', steps_per_epoch)
-
-    kl.train(train_gen,
-             val_gen,
-             saved_model_path=new_model_path,
-             steps=steps_per_epoch,
-             train_split=cfg.TRAIN_TEST_SPLIT)
 
 
 if __name__ == '__main__':
