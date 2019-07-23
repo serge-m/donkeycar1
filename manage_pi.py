@@ -79,44 +79,10 @@ def drive(cfg, model_path=None, use_chaos=False):
           outputs=['pilot/angle', 'pilot/throttle'],
           run_condition='run_pilot')
 
-    # Choose what inputs should change the car.
-    def drive_mode(mode,
-                   user_angle, user_throttle,
-                   pilot_angle, pilot_throttle):
-        if mode == 'user':
-            return user_angle, user_throttle
 
-        elif mode == 'local_angle':
-            return pilot_angle, user_throttle
+    driver = ArduinoDriver() 
 
-        else:
-            return pilot_angle, pilot_throttle
-
-    drive_mode_part = Lambda(drive_mode)
-    V.add(drive_mode_part,
-          inputs=['user/mode', 'user/angle', 'user/throttle',
-                  'pilot/angle', 'pilot/throttle'],
-          outputs=['angle', 'throttle'])
-
-    #steering_controller = None #PCA9685(cfg.STEERING_CHANNEL)
-    #steering = PWMSteering(controller=steering_controller,
-    #                       left_pulse=cfg.STEERING_LEFT_PWM,
-    #                       right_pulse=cfg.STEERING_RIGHT_PWM) 
-
-    #throttle_controller = None #PCA9685(cfg.THROTTLE_CHANNEL)
-    #throttle = PWMThrottle(controller=throttle_controller,
-    #                       max_pulse=cfg.THROTTLE_FORWARD_PWM,
-    #                       zero_pulse=cfg.THROTTLE_STOPPED_PWM,
-    #                       min_pulse=cfg.THROTTLE_REVERSE_PWM)
-
-
-    md = MotorDriver()
-
-    steering = PWMSteering(motor_driver=md)
-    throttle = PWMThrottle(motor_driver=md)
-
-    V.add(steering, inputs=['angle'])
-    V.add(throttle, inputs=['throttle'])
+    V.add(driver, inputs=['user/mode', 'pilot/angle', 'pilot/throttle'], outputs=['user/angle', 'user/throttle'])
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
