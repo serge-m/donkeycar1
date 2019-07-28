@@ -52,6 +52,7 @@ class Ard:
             self.latest = split[0]
             return None, None
         line, self.latest = split
+        print(line, self.latest)
 
         steering, throttle = None, None
         for command in line.splitlines():
@@ -71,18 +72,19 @@ class ArduinoDriver:
         self.ard = Ard()
 
     def run(self, mode, angle, throttle):
+        print("model {}".format(mode))
         if mode == 'user':
-            self.ard.send('g 1')
+            self.ard.send('go 1')
             self.ard.send('r')
             user_angle, user_throttle = self.ard.read_latest_state()
             return user_angle, user_throttle
         else:
-            self.ard.send('g 2 {} {}'.format(self.scale_angle(angle), self.scale_throttle(throttle)))
+            self.ard.send('go 2 {} {}'.format(self.scale_angle(angle), self.scale_throttle(throttle)))
             return None, None
 
     def shutdown(self):
         logger.info("Steering shutdown")
-        self.ard.send('g 1')
+        self.ard.send('go 1')
         self.ard.close()
 
     def scale_angle(self, angle):
