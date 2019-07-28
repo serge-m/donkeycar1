@@ -25,6 +25,7 @@ from donkeycar.parts.keras import KerasLinear
 from donkeycar.parts.transform import Lambda
 
 from actuators import PWMSteering, PWMThrottle, MotorDriver
+from arduino_driver import ArduinoDriver
 
 from web_controller import LocalWebControllerVis
 from top_view_transform import TopViewTransform
@@ -78,7 +79,6 @@ def drive(cfg, model_path=None, use_chaos=False):
           inputs=['cam/image_array'],
           outputs=['pilot/angle', 'pilot/throttle'],
           run_condition='run_pilot')
-
 
     driver = ArduinoDriver() 
 
