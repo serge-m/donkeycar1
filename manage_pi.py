@@ -133,7 +133,7 @@ def drive_vis(cfg, model_path=None, use_chaos=False):
     ctr = LocalWebControllerVis(use_chaos=use_chaos)
     V.add(ctr,
           inputs=['cam/image_array_proj', 'pilot/angle', 'pilot/throttle'],
-          outputs=['user/angle', 'user/throttle', 'user/mode', 'recording'],
+          outputs=['user/mode', 'recording'],
           threaded=True)
 
     # See if we should even run the pilot module.
@@ -163,25 +163,9 @@ def drive_vis(cfg, model_path=None, use_chaos=False):
                   'pilot/angle', 'pilot/throttle'],
           outputs=['angle', 'throttle'])
 
-    #steering_controller = None #PCA9685(cfg.STEERING_CHANNEL)
-    #steering = PWMSteering(controller=steering_controller,
-    #                       left_pulse=cfg.STEERING_LEFT_PWM,
-    #                       right_pulse=cfg.STEERING_RIGHT_PWM) 
+    driver = ArduinoDriver()
 
-    #throttle_controller = None #PCA9685(cfg.THROTTLE_CHANNEL)
-    #throttle = PWMThrottle(controller=throttle_controller,
-    #                       max_pulse=cfg.THROTTLE_FORWARD_PWM,
-    #                       zero_pulse=cfg.THROTTLE_STOPPED_PWM,
-    #                       min_pulse=cfg.THROTTLE_REVERSE_PWM)
-
-
-    md = MotorDriver()
-
-    steering = PWMSteering(motor_driver=md)
-    throttle = PWMThrottle(motor_driver=md)
-
-    V.add(steering, inputs=['angle'])
-    V.add(throttle, inputs=['throttle'])
+    V.add(driver, inputs=['user/mode', 'pilot/angle', 'pilot/throttle'], outputs=['user/angle', 'user/throttle'])
 
     # add tub to save data
     inputs = ['cam/image_array', 'user/angle', 'user/throttle', 'user/mode', 'timestamp']
